@@ -1,0 +1,491 @@
+--[[
+    LiquidGlassLib - iOS 27 Hyper-Translucent Liquid Glass UI for Roblox
+    Features: Anisotropic Specular Highlights, Fluid Micro-interactions, Layered Acrylic Depth
+]]
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or CoreGui
+
+local LiquidGlass = {
+    Themes = {
+        -- Ultra-high transparency base
+        WindowBackdrop = Color3.fromRGB(12, 16, 28),
+        WindowTransparency = 0.72,
+        
+        -- Liquid Glass Inset Cards
+        Card = Color3.fromRGB(255, 255, 255),
+        CardTransparency = 0.94,
+        CardHoverTransparency = 0.88,
+        
+        -- iOS Liquid Accents
+        Accent = Color3.fromRGB(0, 230, 255),
+        AccentGradient = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 235, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(160, 60, 255))
+        }),
+        
+        -- Specular & Prismatic Rim
+        Text = Color3.fromRGB(248, 250, 255),
+        TextMuted = Color3.fromRGB(150, 160, 185),
+        Stroke = Color3.fromRGB(255, 255, 255),
+        StrokeTransparency = 0.78
+    }
+}
+
+local function tween(object, info, properties)
+    local anim = TweenService:Create(object, info, properties)
+    anim:Play()
+    return anim
+end
+
+local function enableDrag(frame, dragHandle)
+    local dragging, dragInput, dragStart, startPos
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            tween(frame, TweenInfo.new(0.06, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+                Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            })
+        end
+    end)
+end
+
+function LiquidGlass:CreateWindow(config)
+    config = config or {}
+    local title = config.Title or "LIQUID // OS"
+    local subtitle = config.Subtitle or "Liquid Glass v2.7"
+    local size = config.Size or UDim2.new(0, 530, 0, 360)
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "LiquidGlass_" .. math.random(1000, 9999)
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local success, _ = pcall(function()
+        screenGui.Parent = CoreGui
+    end)
+    if not success then
+        screenGui.Parent = PlayerGui
+    end
+
+    -- Main Container (Liquid Glass Base)
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "Window"
+    mainFrame.Size = size
+    mainFrame.Position = UDim2.new(0.5, -size.X.Offset / 2, 0.5, -size.Y.Offset / 2)
+    mainFrame.BackgroundColor3 = LiquidGlass.Themes.WindowBackdrop
+    mainFrame.BackgroundTransparency = LiquidGlass.Themes.WindowTransparency
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 20)
+    corner.Parent = mainFrame
+
+    -- Specular Prismatic Edge (เลียนแบบการหักเหแสงสีรุ้งที่ขอบกระจกใส)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = LiquidGlass.Themes.StrokeTransparency
+    stroke.Thickness = 1.2
+    stroke.Parent = mainFrame
+
+    local strokeGradient = Instance.new("UIGradient")
+    strokeGradient.Rotation = 65
+    strokeGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(180, 240, 255)),
+        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(220, 180, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255))
+    })
+    strokeGradient.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.2),
+        NumberSequenceKeypoint.new(0.5, 0.8),
+        NumberSequenceKeypoint.new(1, 0.3)
+    })
+    strokeGradient.Parent = stroke
+
+    -- Liquid Gloss Sheen (เงาสะท้อนแสงด้านบนตัวหน้าต่าง)
+    local glossSheen = Instance.new("Frame")
+    glossSheen.Name = "GlossSheen"
+    glossSheen.Size = UDim2.new(1, 0, 0.45, 0)
+    glossSheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    glossSheen.BorderSizePixel = 0
+    glossSheen.Parent = mainFrame
+
+    local glossCorner = Instance.new("UICorner")
+    glossCorner.CornerRadius = UDim.new(0, 20)
+    glossCorner.Parent = glossSheen
+
+    local glossGrad = Instance.new("UIGradient")
+    glossGrad.Rotation = 90
+    glossGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.90),
+        NumberSequenceKeypoint.new(0.4, 0.96),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    glossGrad.Parent = glossSheen
+
+    -- Header / Title Bar
+    local header = Instance.new("Frame")
+    header.Name = "Header"
+    header.Size = UDim2.new(1, 0, 0, 52)
+    header.BackgroundTransparency = 1
+    header.ZIndex = 2
+    header.Parent = mainFrame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -70, 0, 24)
+    titleLabel.Position = UDim2.new(0, 20, 0, 14)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Text = title
+    titleLabel.TextColor3 = LiquidGlass.Themes.Text
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Parent = header
+
+    local subLabel = Instance.new("TextLabel")
+    subLabel.Size = UDim2.new(0, 120, 0, 12)
+    subLabel.Position = UDim2.new(0, titleLabel.TextBounds.X + 32, 0, 18)
+    subLabel.Font = Enum.Font.GothamMedium
+    subLabel.Text = subtitle
+    subLabel.TextColor3 = LiquidGlass.Themes.TextMuted
+    subLabel.TextSize = 11
+    subLabel.TextXAlignment = Enum.TextXAlignment.Left
+    subLabel.BackgroundTransparency = 1
+    subLabel.Parent = header
+
+    enableDrag(mainFrame, header)
+
+    -- Floating Glass Navigation Bar (Sidebar)
+    local nav = Instance.new("ScrollingFrame")
+    nav.Name = "Navigation"
+    nav.Size = UDim2.new(0, 136, 1, -70)
+    nav.Position = UDim2.new(0, 16, 0, 54)
+    nav.BackgroundTransparency = 1
+    nav.ScrollBarThickness = 0
+    nav.ZIndex = 2
+    nav.Parent = mainFrame
+
+    local navLayout = Instance.new("UIListLayout")
+    navLayout.Padding = UDim.new(0, 6)
+    navLayout.Parent = nav
+
+    -- Content Canvas
+    local contentArea = Instance.new("Frame")
+    contentArea.Name = "ContentArea"
+    contentArea.Size = UDim2.new(1, -180, 1, -70)
+    contentArea.Position = UDim2.new(0, 164, 0, 54)
+    contentArea.BackgroundTransparency = 1
+    contentArea.ZIndex = 2
+    contentArea.Parent = mainFrame
+
+    local WindowController = { Tabs = {}, CurrentTab = nil }
+
+    function WindowController:CreateTab(tabName)
+        local tabBtn = Instance.new("TextButton")
+        tabBtn.Name = tabName .. "_Tab"
+        tabBtn.Size = UDim2.new(1, 0, 0, 36)
+        tabBtn.BackgroundColor3 = LiquidGlass.Themes.Card
+        tabBtn.BackgroundTransparency = 1
+        tabBtn.Font = Enum.Font.GothamMedium
+        tabBtn.Text = "   " .. tabName
+        tabBtn.TextColor3 = LiquidGlass.Themes.TextMuted
+        tabBtn.TextSize = 13
+        tabBtn.TextXAlignment = Enum.TextXAlignment.Left
+        tabBtn.AutoButtonColor = false
+        tabBtn.Parent = nav
+
+        local tabCorner = Instance.new("UICorner")
+        tabCorner.CornerRadius = UDim.new(0, 10)
+        tabCorner.Parent = tabBtn
+
+        local tabIndicator = Instance.new("Frame")
+        tabIndicator.Size = UDim2.new(0, 3, 0, 16)
+        tabIndicator.Position = UDim2.new(0, 0, 0.5, -8)
+        tabIndicator.BackgroundColor3 = LiquidGlass.Themes.Accent
+        tabIndicator.BackgroundTransparency = 1
+        tabIndicator.Parent = tabBtn
+
+        local indCorner = Instance.new("UICorner")
+        indCorner.CornerRadius = UDim.new(1, 0)
+        indCorner.Parent = tabIndicator
+
+        local page = Instance.new("ScrollingFrame")
+        page.Name = tabName .. "_Page"
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.ScrollBarThickness = 2
+        page.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
+        page.ScrollBarImageTransparency = 0.8
+        page.Visible = false
+        page.Parent = contentArea
+
+        local pageLayout = Instance.new("UIListLayout")
+        pageLayout.Padding = UDim.new(0, 8)
+        pageLayout.Parent = page
+
+        pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 8)
+        end)
+
+        local function activateTab()
+            for _, t in pairs(WindowController.Tabs) do
+                tween(t.Button, TweenInfo.new(0.2), { BackgroundTransparency = 1, TextColor3 = LiquidGlass.Themes.TextMuted })
+                tween(t.Indicator, TweenInfo.new(0.2), { BackgroundTransparency = 1 })
+                t.Page.Visible = false
+            end
+            tween(tabBtn, TweenInfo.new(0.2), { BackgroundTransparency = LiquidGlass.Themes.CardTransparency, TextColor3 = LiquidGlass.Themes.Text })
+            tween(tabIndicator, TweenInfo.new(0.2), { BackgroundTransparency = 0 })
+            page.Visible = true
+            WindowController.CurrentTab = tabName
+        end
+
+        tabBtn.MouseButton1Click:Connect(activateTab)
+        if not WindowController.CurrentTab then activateTab() end
+
+        local TabController = { Button = tabBtn, Indicator = tabIndicator, Page = page }
+        table.insert(WindowController.Tabs, TabController)
+
+        -- Element: Liquid Button
+        function TabController:CreateButton(btnText, callback)
+            callback = callback or function() end
+
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 40)
+            btn.BackgroundColor3 = LiquidGlass.Themes.Card
+            btn.BackgroundTransparency = LiquidGlass.Themes.CardTransparency
+            btn.Font = Enum.Font.Gotham
+            btn.Text = "   " .. btnText
+            btn.TextColor3 = LiquidGlass.Themes.Text
+            btn.TextSize = 13
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.AutoButtonColor = false
+            btn.Parent = page
+
+            local bCorner = Instance.new("UICorner")
+            bCorner.CornerRadius = UDim.new(0, 12)
+            bCorner.Parent = btn
+
+            local bStroke = Instance.new("UIStroke")
+            bStroke.Color = Color3.fromRGB(255, 255, 255)
+            bStroke.Transparency = 0.90
+            bStroke.Parent = btn
+
+            btn.MouseEnter:Connect(function()
+                tween(btn, TweenInfo.new(0.2), { BackgroundTransparency = LiquidGlass.Themes.CardHoverTransparency })
+                tween(bStroke, TweenInfo.new(0.2), { Transparency = 0.72 })
+            end)
+            btn.MouseLeave:Connect(function()
+                tween(btn, TweenInfo.new(0.2), { BackgroundTransparency = LiquidGlass.Themes.CardTransparency })
+                tween(bStroke, TweenInfo.new(0.2), { Transparency = 0.90 })
+            end)
+            btn.MouseButton1Click:Connect(function()
+                tween(btn, TweenInfo.new(0.06), { Size = UDim2.new(0.98, 0, 0, 38) })
+                task.wait(0.06)
+                tween(btn, TweenInfo.new(0.06), { Size = UDim2.new(1, 0, 0, 40) })
+                callback()
+            end)
+        end
+
+        -- Element: Liquid Pill Toggle
+        function TabController:CreateToggle(toggleText, default, callback)
+            default = default or false
+            callback = callback or function() end
+            local state = default
+
+            local frame = Instance.new("TextButton")
+            frame.Size = UDim2.new(1, 0, 0, 42)
+            frame.BackgroundColor3 = LiquidGlass.Themes.Card
+            frame.BackgroundTransparency = LiquidGlass.Themes.CardTransparency
+            frame.Text = ""
+            frame.AutoButtonColor = false
+            frame.Parent = page
+
+            local fCorner = Instance.new("UICorner")
+            fCorner.CornerRadius = UDim.new(0, 12)
+            fCorner.Parent = frame
+
+            local fStroke = Instance.new("UIStroke")
+            fStroke.Color = Color3.fromRGB(255, 255, 255)
+            fStroke.Transparency = 0.90
+            fStroke.Parent = frame
+
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, -70, 1, 0)
+            label.Position = UDim2.new(0, 14, 0, 0)
+            label.BackgroundTransparency = 1
+            label.Font = Enum.Font.Gotham
+            label.Text = toggleText
+            label.TextColor3 = LiquidGlass.Themes.Text
+            label.TextSize = 13
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = frame
+
+            local pill = Instance.new("Frame")
+            pill.Size = UDim2.new(0, 40, 0, 22)
+            pill.Position = UDim2.new(1, -54, 0.5, -11)
+            pill.BackgroundColor3 = state and LiquidGlass.Themes.Accent or Color3.fromRGB(255, 255, 255)
+            pill.BackgroundTransparency = state and 0.15 or 0.88
+            pill.Parent = frame
+
+            local pCorner = Instance.new("UICorner")
+            pCorner.CornerRadius = UDim.new(1, 0)
+            pCorner.Parent = pill
+
+            local thumb = Instance.new("Frame")
+            thumb.Size = UDim2.new(0, 16, 0, 16)
+            thumb.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+            thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            thumb.Parent = pill
+
+            local tCorner = Instance.new("UICorner")
+            tCorner.CornerRadius = UDim.new(1, 0)
+            tCorner.Parent = thumb
+
+            frame.MouseButton1Click:Connect(function()
+                state = not state
+                local targetPillColor = state and LiquidGlass.Themes.Accent or Color3.fromRGB(255, 255, 255)
+                local targetTrans = state and 0.15 or 0.88
+                local targetPos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+
+                tween(pill, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = targetPillColor,
+                    BackgroundTransparency = targetTrans
+                })
+                tween(thumb, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                    Position = targetPos
+                })
+                callback(state)
+            end)
+        end
+
+        -- Element: Liquid Fluid Slider
+        function TabController:CreateSlider(sliderText, min, max, default, callback)
+            min = min or 0
+            max = max or 100
+            default = default or min
+            callback = callback or function() end
+
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(1, 0, 0, 52)
+            frame.BackgroundColor3 = LiquidGlass.Themes.Card
+            frame.BackgroundTransparency = LiquidGlass.Themes.CardTransparency
+            frame.Parent = page
+
+            local fCorner = Instance.new("UICorner")
+            fCorner.CornerRadius = UDim.new(0, 12)
+            fCorner.Parent = frame
+
+            local fStroke = Instance.new("UIStroke")
+            fStroke.Color = Color3.fromRGB(255, 255, 255)
+            fStroke.Transparency = 0.90
+            fStroke.Parent = frame
+
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, -70, 0, 20)
+            label.Position = UDim2.new(0, 14, 0, 8)
+            label.BackgroundTransparency = 1
+            label.Font = Enum.Font.Gotham
+            label.Text = sliderText
+            label.TextColor3 = LiquidGlass.Themes.Text
+            label.TextSize = 13
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Parent = frame
+
+            local valLabel = Instance.new("TextLabel")
+            valLabel.Size = UDim2.new(0, 50, 0, 20)
+            valLabel.Position = UDim2.new(1, -64, 0, 8)
+            valLabel.BackgroundTransparency = 1
+            valLabel.Font = Enum.Font.GothamBold
+            valLabel.Text = tostring(default)
+            valLabel.TextColor3 = LiquidGlass.Themes.Accent
+            valLabel.TextSize = 12
+            valLabel.TextXAlignment = Enum.TextXAlignment.Right
+            valLabel.Parent = frame
+
+            local track = Instance.new("Frame")
+            track.Size = UDim2.new(1, -28, 0, 6)
+            track.Position = UDim2.new(0, 14, 0, 36)
+            track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            track.BackgroundTransparency = 0.90
+            track.Parent = frame
+
+            local tCorner = Instance.new("UICorner")
+            tCorner.CornerRadius = UDim.new(1, 0)
+            tCorner.Parent = track
+
+            local fill = Instance.new("Frame")
+            local initPct = math.clamp((default - min) / (max - min), 0, 1)
+            fill.Size = UDim2.new(initPct, 0, 1, 0)
+            fill.BackgroundColor3 = LiquidGlass.Themes.Accent
+            fill.Parent = track
+
+            local fillCorner = Instance.new("UICorner")
+            fillCorner.CornerRadius = UDim.new(1, 0)
+            fillCorner.Parent = fill
+
+            local dragging = false
+            local function updateDrag(input)
+                local trackSize = track.AbsoluteSize.X
+                local clickX = math.clamp(input.Position.X - track.AbsolutePosition.X, 0, trackSize)
+                local percentage = clickX / trackSize
+                local value = math.floor(min + ((max - min) * percentage))
+
+                tween(fill, TweenInfo.new(0.04), { Size = UDim2.new(percentage, 0, 1, 0) })
+                valLabel.Text = tostring(value)
+                callback(value)
+            end
+
+            track.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    updateDrag(input)
+                end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    updateDrag(input)
+                end
+            end)
+        end
+
+        return TabController
+    end
+
+    return WindowController
+end
+
+return LiquidGlass
