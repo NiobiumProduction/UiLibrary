@@ -274,6 +274,47 @@ function LiquidGlass:CreateWindow(config)
         local TabController = { Button = tabBtn, Indicator = tabIndicator, Page = page }
         table.insert(WindowController.Tabs, TabController)
 
+        -- Element: Text input field
+        function TabController:CreateInput(placeholderText, callback)
+            callback = callback or function() end
+
+            local input = Instance.new("TextBox")
+            input.Name = "Input_" .. tostring(placeholderText or "Field")
+            input.Size = UDim2.new(1, 0, 0, 40)
+            input.BackgroundColor3 = LiquidGlass.Themes.Card
+            input.BackgroundTransparency = LiquidGlass.Themes.CardTransparency
+            input.Font = Enum.Font.Gotham
+            input.Text = ""
+            input.PlaceholderText = tostring(placeholderText or "Enter value")
+            input.TextColor3 = LiquidGlass.Themes.Text
+            input.PlaceholderColor3 = LiquidGlass.Themes.TextMuted
+            input.TextSize = 13
+            input.TextXAlignment = Enum.TextXAlignment.Left
+            input.ClearTextOnFocus = false
+            input.AutoLocalize = false
+            input.Parent = page
+
+            local inputPadding = Instance.new("UIPadding")
+            inputPadding.PaddingLeft = UDim.new(0, 12)
+            inputPadding.PaddingRight = UDim.new(0, 12)
+            inputPadding.Parent = input
+
+            local inputCorner = Instance.new("UICorner")
+            inputCorner.CornerRadius = UDim.new(0, 12)
+            inputCorner.Parent = input
+
+            local inputStroke = Instance.new("UIStroke")
+            inputStroke.Color = Color3.fromRGB(255, 255, 255)
+            inputStroke.Transparency = 0.90
+            inputStroke.Parent = input
+
+            input.FocusLost:Connect(function(enterPressed)
+                callback(input.Text, enterPressed)
+            end)
+
+            return input
+        end
+
         -- Element: Liquid Button
         function TabController:CreateButton(btnText, callback)
             callback = callback or function() end
